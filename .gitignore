@@ -8,3 +8,26 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Fichiers auxiliaires LaTeX
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.glo
+*.ist
+*.glg
+*.gls
+*.log
+*.out
+*.toc
+*.run.xml
+*.lof
+*.lot
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.listing
+
+# Dossiers générés par minted
+_minted-*/

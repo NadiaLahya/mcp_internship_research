@@ -1,0 +1,432 @@
+% ---------------- PACKAGES ----------------
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{template} 
+\usepackage{xcolor}
+\usepackage{glossaries}
+\usepackage{graphicx}
+\usepackage{minted}
+\usepackage[backend=biber,style=authoryear]{biblatex}
+\usepackage{csquotes}
+\addbibresource{biblio.bib}
+\renewcommand{\ttdefault}{lmtt}
+
+% ---------------- INFO POUR LA PAGE DE GARDE ----------------
+\matiere{Introduction IA transversale - S5}
+\codeMatiere{XADO505A}
+\titreTP{GenAI labs : trouvez un stage à l'étranger}
+\enseignant{Arsène FOUGEROUSE}
+\auteur{Nadia LAHYA}
+\dateRendu{31 Janvier 2026}
+
+% ---------------- GLOSSAIRE ----------------
+\makeglossaries
+
+\newglossaryentry{mcp}{
+    name={MCP (Model Context Protocol)},
+    description={: Protocole ouvert développé par Anthropic permettant de connecter des sources de données locales ou des outils personnalisés (comme mon serveur de scoring Python) à des modèles de langage (LLM) de manière standardisée}
+}
+
+\newglossaryentry{sse}{
+    name={SSE (Server-Sent Events)},
+    description={: Technologie de push serveur permettant à une application cliente (ici n8n) de recevoir des mises à jour automatiques via une connexion HTTP persistante. Utilisé pour exposer les outils de mon serveur local sur le réseau}
+}
+
+\newglossaryentry{llm}{
+    name={LLM (Large Language Model)},
+    description={: Modèle de langage entraîné sur de vastes quantités de données, capable de comprendre et de générer du texte, utilisé ici pour analyser la pertinence des offres de stage}
+}
+
+\newglossaryentry{hallucination}{
+    name={hallucination},
+    description={: Phénomène par lequel une intelligence artificielle génère des informations factuellement incorrectes mais présentées de manière convaincante (ex: inventer un salaire ou une localisation)}
+}
+
+\newglossaryentry{n8n}{
+    name={n8n},
+    description={: Outil d'automatisation de workflow (Low-Code) basé sur les nœuds, permettant d'orchestrer des tâches entre différentes APIs et services}
+}
+
+\newglossaryentry{tavily}{
+    name={Tavily},
+    description={: Moteur de recherche spécifiquement optimisé pour les agents IA, capable de filtrer le "bruit" des pages web pour ne retourner que le contenu textuel pertinent pour un LLM}
+}
+
+
+\newglossaryentry{prompt_engineering}{
+    name={Prompt Engineering},
+    description={: L'art et la science de concevoir, d'affiner et d'optimiser les instructions (prompts) envoyées à une IA pour obtenir les résultats les plus précis et fiables possibles}
+}
+
+\newglossaryentry{webhook}{
+    name={Webhook},
+    description={: Méthode permettant à une application de fournir des informations en temps réel à d'autres applications. Utilisé ici pour envoyer les résultats finaux vers le serveur Discord}
+}
+
+\newglossaryentry{fallback}{
+    name={fallback},
+    description={: Solution de secours ou comportement par défaut implémenté dans le code pour éviter une erreur système si une ressource principale (comme une réponse d'IA) fait défaut}
+}
+
+\newglossaryentry{parsing}{
+    name={Parsing},
+    description={: Processus d'analyse d'une chaîne de caractères pour la transformer en une structure de données utilisable par un programme (ex: transformer du texte brut en objet JSON)}
+}
+
+\newglossaryentry{uv}{
+    name={uv},
+    description={: Gestionnaire de paquets et d'environnements Python ultra-rapide utilisé pour isoler les dépendances du serveur MCP}
+}
+
+% ---------------- DEBUT DU RAPPORT ----------------
+\begin{document}
+\makeTitlePage
+
+\newpage 
+\setcounter{tocdepth}{3}
+\tableofcontents
+\newpage
+
+
+\section{Résumé}
+Ce projet détaille la mise en place d'un système expert automatisé pour la recherche de stages à l'étranger. 
+
+En utilisant \gls{n8n}\footnote{Les mots accompagnés d'une \textcolor{DO}{*} sont définis dans le glossaire à la fin du rapport.}, \gls{tavily} et Mistral AI, j'ai conçu un workflow intelligent capable de rechercher des sources multilingues (italien et anglais), à les évaluer via un serveur \gls{mcp} local (\texttt{mcp\_server.py}), à créer un fichier \texttt{CSV} avec les offres trouvées et à extraire les opportunités les plus intéressantes vers Discord.
+
+Je me suis focalisée sur Milan (priorité absolue) et Genève, en témoignant de mon désir de faire un stage principalement en Italie ou dans un pays qui soit à proximité et dans lequel je pourrait tout de même exercer mon anglais. Le système met en place une stratégie double d'interrogation \gls{llm} (agent HTTP et agent IA) dans le but d'optimiser la pertinence des réponses.
+
+\section{Justification de mon approche} 
+J'ai choisi une installation locale (non-conteneurisée) du serveur MCP et de n8n pour plusieurs raisons :
+\begin{itemize}
+    \item Facilité de développement : tests et adaptations du code en temps réel sans rebuild
+    \item Usage personnel : pas de nécessité de portabilité Docker pour ce cas d'usage
+    \item Rapidité d'itération : modifications instantanées pendant le développement
+    \item Conformité aux exigences : la conteneurisation n'était pas une exigence du projet
+\end{itemize}
+
+\section{Déployer le MCP Server de scoring de ville}
+Le serveur Python (\texttt{mcp\_server.py}) agit comme un oracle géographique pour le workflow, fournissant des scores de qualité de vie basés sur l'indice Numbeo en utilisant le classement de  ~\cite{KAKLAUSKAS201882}.
+
+    \subsection{Chercher le score d'une ville} 
+
+        \subsubsection{Préparer l'environnement Python} 
+        Le projet utilise \gls{uv} pour la gestion de l'environnement virtuel :
+            \begin{console}[minted language=bash] 
+                $ uv init
+                $ uv add "mcp[cli]"
+            \end{console}
+            
+        \subsubsection{Récupération des données}
+            Le dataset (\texttt{city\_scores.json}) suit le classement Numbeo, comme cité précédemment. Ce choix s'est imposé car la qualité de vie est un critère important pour moi, afin de choisir où réaliser mon futur stage.
+
+            Exemple des données:
+            \begin{console}[minted language=json] 
+                {
+                  "edinburgh": 1,
+                  "zurich": 2,
+                }
+            \end{console}
+
+        \subsubsection{Création du serveur} 
+            \begin{console}[minted language=python] 
+from typing import Dict, List, Optional
+from mcp.server.fastmcp import FastMCP
+import json
+
+try:
+    with open("city_scores.json", "r") as f:
+        data = json.load(f)
+except FileNotFoundError:
+    data = {}
+    print("Fichier city_scores.json non trouvé. Le serveur démarre avec des données vides.")
+
+mcp = FastMCP(name="city-ranker", host="0.0.0.0", port=8001)
+
+@mcp.tool()
+def find_city_ranking(city: str) -> Dict:
+    city_clean = city.lower().strip()
+    rank = data.get(city_clean)
+    if rank:
+        return {"city": city, "ranking": rank, "message": f"La ville de {city} est classée #{rank} au classement Qualité de Vie (N)." }
+    else:
+        return {"city": city, "ranking": None, "message": f"Aucune donnée de classement pour {city}."}
+
+@mcp.tool()
+def list_cities(limit: int = 10) -> Dict:
+    sorted_cities = sorted(data.items(), key=lambda item: item[1])
+    subset = sorted_cities[:limit]
+    cities_list = [{"city": city.title(), "ranking": rank} for city, rank in subset]
+    return {"count": len(cities_list), "cities": cities_list}
+
+def main(): 
+    print("Démarrage du serveur MCP City Ranker...")
+    print(f"{len(data)} villes chargées")
+    print("Utilisez l'inspecteur MCP pour tester:")
+    print("npx @modelcontextprotocol/inspector uv run --python 3.11 mcp_server.py")
+    #mcp.run()  #STDIO pour l'inspection MCP
+    mcp.run(transport="streamable-http", mount_path="/mcp") # HTTP/StreamableHttp pour n8n
+
+if __name__ == "__main__":
+    main()
+            \end{console}
+
+        Pour mes tests, lors de l'impléméntataion du serveur, j'utilisais l'inspecteur de MCP qui se base sur \texttt{STDIO} comme mode de transport. Ainsi, dans le main, au lieu d'utiliser:
+        \begin{console}[minted language=python] 
+            mcp.run(transport="streamable-http", mount_path="/mcp")
+        \end{console}
+        j'utilisais :
+        \begin{console}[minted language=python] 
+            mcp.run()
+        \end{console}
+
+\section{Création du workflow de recherche de stage}
+    Le workflow n8n constitue le cœur du système d'automatisation.
+    
+    \subsection{Sourcing multilingue : "Town x Techno" \& "Prepare query"} 
+        \subsubsection{Génération des paires ville-technologie}
+        Le nœud \texttt{Town x Techno} produit de manière dynamique les associations entre villes et technologies. 
+        
+        Cette configuration met en avant mes priorités géographiques :
+        \begin{console}[minted language=python] 
+const cities = [
+  { city: "Milan", country: "IT", languages: ["it", "en"] },
+  { city: "Geneva", country: "CH", languages: ["fr", "en"] }
+ ];
+
+ const techs = [
+ { tech: "DevOps",
+ synonyms: ["DevSecOps", "Platform Engineering"] },
+ { tech: "Cloud",
+ synonyms: ["AWS", "Azure", "GCP", "Kubernetes"] }
+ ];
+
+// Génération des paires
+ return cities.flatMap(cityObj =>
+ techs.map(techObj => ({
+ city: cityObj.city,
+ country: cityObj.country,
+ languages: cityObj.languages,
+ technology: techObj.tech,
+ synonyms: techObj.synonyms
+ }))
+        \end{console}    
+Pour améliorer le taux de correspondance, j'ai introduit un système de gestion des synonymes afin de prendre en compte les multiples sémantiques employées par les recruteurs.
+
+\subsubsection{Gestion multilingue adaptative}
+Le nœud \texttt{Prepare query} est un point clé de mon projet : la gestion dynamique des langues multiples. En raison de mon intention d'effectuer principalement mon stage en Italie (Milan) ou dans un pays dans lequel je peux exercer mon anglais (Genève), j'ai conçu des requêtes ajustées sur le plan linguistique :
+
+\begin{itemize}
+    \item {Pour Milan} : Recherche en italien ou en anglais
+    \item {Pour Genève} : Recherche en français ou en anglais 
+\end{itemize}
+
+Cette approche permet de découvrir des offres locales que des recherches uniquement en anglais auraient manquées. 
+
+Exemple de traduction pour Milan :
+\begin{console}[minted language=javascript] 
+it: {
+  internship: '"stage" OR "tirocinio"',
+  context: '("candidati" OR "carriere" OR "lavoro" OR "posizioni aperte")',
+  duration: '("2 mesi" OR "9 settimane" OR "estate" OR "luglio" OR "agosto")',
+  exclude: '-affitto -stanza -immobiliare' //exclue les annonces de location
+}
+\end{console}
+
+La requête complète générée devient :
+\begin{console}[minted language=text]
+"DevOps" stage OR tirocinio "Milan" 
+(2 mesi OR 9 settimane OR estate OR luglio OR agosto) 
+candidati OR carriere OR lavoro OR posizioni aperte) 
+2026 -wiki -pedia -tutorial -affitto -stanza
+\end{console}
+
+    \subsection{Double stratégie d'appel LLM}
+    Afin de diversifier les nœuds, j'ai utilisé deux approches pour interroger Mistral Cloud :
+    \begin{itemize}
+        \item IA Agent : Pour l'analyse profonde et l'extraction de données structurées, comme imagé sur la figure \ref{fig:AgentIA}.
+        \item Nœud HTTP : Pour la mise en forme du message final Discord, comme illustré sur la figure \ref{fig:discord}.
+    \end{itemize}
+
+    \begin{figure}[h!]
+        \centering
+        \begin{minipage}{0.48\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{images/AI_Agent_node.png}
+            \caption{Nœud 'Agent IA' en utilisant Mistral en tant que LLM}
+            \label{fig:AgentIA}
+        \end{minipage}
+        \hfill % Espace élastique entre les deux images
+        \begin{minipage}{0.43\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{images/HTTP_node.png}
+            \caption{Nœud HTTP faisant appel à l'API Mistral}
+            \label{fig:discord}
+        \end{minipage}
+    \end{figure}
+
+    \subsection{Système de classification : TOP / BOF / NON}
+        \subsubsection{Justification du système de verdict}
+        Vu volume important de résultats de recherche, j'ai implémenté un système de classification tripartite pour filtrer efficacement les opportunités :
+
+    \begin{center}
+        \begin{tabular}{|p{2cm}|p{15.5cm}|}
+        \hline
+            \textbf{Verdict} & \textbf{Critères d'attribution} \\
+            \hline
+            \textbf{TOP} & Offre parfaitement alignée : durée 8-10 semaines, technologie correspondante exactement, deadline compatible (après février 2026), rémunération mentionnée, entreprise reconnue \\
+            \hline
+            \textbf{BOF} & Offre acceptable avec compromis : durée limite (6-12 semaines), technologie adjacente mais pertinente, localisation secondaire, salaire non précisé mais probable \\
+            \hline
+            \textbf{NON} & Offre non pertinente : durée inadéquate (<6 ou >12 semaines), technologie sans rapport, CDI au lieu de stage, deadline passée, localisation géographique erronée \\
+        \hline
+        \end{tabular}
+    \end{center}
+
+Ce système permet de récupérer automatiquement le Top 3 des meilleures offres pour la notification Discord.
+
+        \subsubsection{Filtrage et Restructuration des données}
+        Une étape critique a été la restructuration des données entre les nœuds \texttt{Format agent input} et \texttt{Format agent output}. 
+        
+        Le nœud \texttt{Format agent output} effectue plusieurs opérations essentielles :
+        \begin{enumerate}
+            \item \gls{parsing} sécurisé : Gestion des réponses JSON avec multiples \gls{fallback} (ex. score d'une ville a 50 si le score n'est pas connu)
+            \item Nettoyage : Suppression des marqueurs Markdown (\texttt{```json})
+            \item Réorganisation : Mise en ordre des colonnes pour export CSV
+            \item Fusion des compétences : Transformation de \texttt{["Java", "AWS"]} en \texttt{"Java, AWS"}
+            \item Gestion d'erreurs : Capture des offres mal formatées sans interrompre le workflow
+        \end{enumerate}
+
+        \subsubsection{Tri et extraction du Top 3}
+        Le nœud \texttt{Sort} effectue un tri hiérarchique selon deux critères :
+        \begin{enumerate}
+            \item Verdict (descendant) : \texttt{TOP} > \texttt{BOF} > \texttt{NON}
+            \item Ville (descendant) : Milan priorisé alphabétiquement
+        \end{enumerate}
+        Cette configuration garantit que Milan apparaît systématiquement en tête des recommandations, conformément à mon souhait n°1 de faire mon stage en Italie.
+
+        Le nœud \texttt{Filter} supprime ensuite les offres marquées \texttt{NON} et les offres de 2025 (périmées), pour ne conserver que les réelles opportunités pour la notification Discord.
+
+\section{Analyse critique et difficultés rencontrées}
+    \subsection{Complexité du démarrage}
+        \subsubsection{Courbe d'apprentissage abrupte}
+        Le démarrage du projet a été particulièrement laborieu. La principale difficulté résidait dans la compréhension de l'architecture MCP et de son intégration avec n8n :
+        \begin{itemize}
+            \item Passage stdio → \gls{sse} : Initialement, ce n'était clair que l'inspecteur et n8n ne communiquaient pas dans le même mode ce qui a fraineé mon démarrage
+            \item Synchronisation des données : Premier verrou technique majeur concernant l'échange de données entre n8n et le serveur local (problèmes de serialization JSON, timeouts, gestion des erreurs de connexion)
+            \item Compréhension du protocole : Temps nécessaire pour maîtriser les concepts de tools, prompts, et ressources dans le contexte MCP
+        \end{itemize}
+
+    \subsection{Les clés d'API}
+    A plusieurs reprises j'ai du changer mon LLM en raison des quotas atteints avec très peu de manipulations.
+
+\subsection{Hallucinations et "folie" de l'IA}
+    \subsubsection{Problématique majeure}
+    J'ai rencontré des problèmes récurrents et frustrants d'\gls{hallucination} où l'IA :
+    \begin{itemize}
+        \item Cherchait des appartements et logements au lieu de stages professionnels
+        \item Confondait les villes (ex: proposer Gênes au lieu de Genève, ou suggérer des offres en France, suggérer des d'autres ville hors celles demandées)
+        \item Attribuait des scores de ville fantaisistes, ignorant totalement les données fournies par le serveur MCP
+        \item Générait des URLs invalides ou des entreprises inexistantes
+    \end{itemize}
+    Ce comportement imprévisible a nécessité plusieurs modifications dans les prompts ainsi qu'une modification intégrale de la méthode de validation.
+
+\subsubsection{Solutions implémentées}
+Après de multiples itérations, j'ai mis en place les solutions suivantes :
+    \begin{enumerate}
+        \item Contraintes explicites dans le prompt 
+        \item Validation côté n8n : Filtrage strict des offres avec URLs manquantes, villes absentes du dataset, ou mots-clés suspects (apartment, rent, flat)  
+        \item Exclusions explicites dans les requêtes Tavily : Ajout de l'exclusion \texttt{-affitto -stanza -immobiliare -housing -rent -room -flat} pour filtrer les résultats de recherche en amont
+    \end{enumerate}
+
+\subsection{Gestion d'erreurs et robustesse du système}
+    \subsubsection{Formats JSON variables}
+    L'IA Agent retournait parfois des formats inconsistants et imprévisibles :
+    \begin{itemize}
+        \item JSON entouré de \texttt{```json ... ```} (marqueurs Markdown)
+        \item Réponse en texte brut au lieu de JSON structuré
+        \item Champs manquants, renommés ou avec types de données incorrects
+        \item Arrays imbriqués de manière non standard
+    \end{itemize}
+
+    
+    \textbf{Solution} : Implémentation d'un parser robuste avec multiples fallbacks dans \texttt{Format agent output}, incluant la détection automatique du format, le nettoyage des marqueurs, et la gestion gracieuse des erreurs.
+    
+    \subsubsection{Timeouts et échecs Tavily}
+    Certaines requêtes Tavily échouaient par timeout (recherches trop complexes ou serveurs distants lents).
+    
+    \textbf{Solution} : Ajout d'un mécanisme de retry avec délai exponentiel, et limitation stricte à \texttt{max\_results: 4}.
+    
+    \subsubsection{Synchronisation des nœuds}
+    La restructuration des données entre nœuds nécessitait une gestion d'erreur robuste pour éviter que le workflow ne s'arrête complètement si une seule offre était mal formatée par le LLM.
+
+    \textbf{Solution} : Système de try-catch exhaustif avec marquage des erreurs (verdict "ERREUR") permettant au workflow de continuer malgré les échecs partiels.
+
+\section{Résultats et performance}
+    \subsection{Bilan opérationnel}
+    Tout fonctionne comme attendu. Le workflow est stable, gère correctement les erreurs et remplit parfaitement son rôle malgré quelques folies encore visiles.
+    
+    \subsubsection{Qualité des résultats}
+    Bien que le nombre d'offres réelles soit parfois limité (à cause de la saisonnalité des stages et des spécificités technologiques recherchées), l'efficacité du tri \texttt{TOP/BOF/NON} assure un service de haute qualité. 
+    
+    Très peu de propositions inexactes atteignent l'alerte finale Discord, ce qui confirme la performance du système de tri et de gestion des hallucinations.
+    
+    \subsection{Exemple de notification Discord générée}
+    Le système génère automatiquement un rapport formaté pour Discord (cf. Annexe B en \ref{Discord})
+
+\section{Conclusion}
+    \subsection{Objectifs atteints}
+    Ce projet a permis de développer un système opérationnel et robuste d'automatisation de recherche de stage à l'étranger. 
+    
+    Les objectifs initiaux sont pleinement atteints :
+    \begin{itemize}
+        \item Gestion multilingue opérationnelle (Italien/Français/Anglais)
+    \item Notation géographique via serveur MCP local (\texttt{mcp\_server.py}) \item Double approche LLM (Agent IA + Requête HTTP) complémentaire
+    \item Système de filtrage intelligent performant basé sur TOP/BOF/NON
+    \item  Alerte automatique des meilleures propositions dans un fichier CSV accompagné d'un message sur Discord (bilan de la recherche + Top 3 des annonces)
+    \item La priorité Milan a été considérée comme le souhait numéro un.
+    \item Gestion d'erreurs solide et flux de travail robuste.
+    \item Gestion maîtrisée de la transformation des données entre les nœuds.
+    \end{itemize}
+
+\subsection{Compétences techniques acquises}
+    \begin{itemize}
+        \item Maîtrise de n8n : Orchestration de workflows complexes multi-étapes
+        \item Intégration MCP : Connexion de services Python aux LLMs via protocole standardisé
+        \item \gls{prompt_engineering} avancé : Lutte contre les hallucinations et optimisation des résultats
+        \item Manipulation de données : Réorganisation, conversion et vérification
+        \item Multilinguisme : Adaptation dynamique des requêtes selon le contexte linguistique
+        \item APIs REST : Intégration Tavily, Mistral AI, Discord
+    \end{itemize}
+    
+    \subsection{Réflexion personnelle}
+    Malgré un début compliqué et frustrant, ce projet m'a donné une vision concrète des problématiques liées à l'automatisation intelligente et des défis associés à l'intégration de différents services d'IA.
+    
+    Lutter contre les hallucinations de l'IA a été très formateur : j'ai appris l'importance fondamentale de la vérification rigoureuse des données, d'un prompt engineering méticuleux, et de ne jamais accorder une confiance absolue aux résultats d'un LLM.
+    
+    Est-ce que je l'ulisierai dans ma future recherche de stage ? Certainement, le workwof m'a permis d'avoir des annonces que l'on retouve pas sur les plateformes classiques. Cependant, en raison des limitations des quotas et les problèmes d'hallucinations, je l'utiliserai en complément d'une recherche manuelle traditionnelle. La recherche manuelle me permettra une recherche pointilleuse tandis que le workflow automatisé m'aidera à découvrir des opportunités inattendues.
+    
+    Choisir une approche locale plutôt que conteneurisée s'est révélé être une décision judicieuse en termes d'apprentissage, qui m'a permis d'effectuer des cycles itératifs rapides. Toutefois, pour une mise en production à long terme, l'utilisation de Docker pour la conteneurisation est indispensable afin de garantir la reproductibilité et la portabilité.
+
+\clearpage
+\section{Annexes}
+\subsection{Annexe A - Capture du workflow n8n complet} 
+    \begin{figure}[h!]
+        \centering
+        \includegraphics[width=1\linewidth]{images/complete_workflow.png}
+        \caption{Capture du workflow n8n complet}
+    \end{figure}
+
+\subsection{Annexe B - Notification Discord}  \label{Discord}
+    \begin{figure}[h!]
+        \centering
+        \includegraphics[width=1\linewidth]{images/discord_message.png}
+        \caption{Exemple d'un message discord}
+    \end{figure}
+
+\clearpage
+\printglossaries
+\printbibliography
+
+\end{document}

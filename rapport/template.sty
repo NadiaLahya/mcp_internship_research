@@ -1,0 +1,146 @@
+% ----------------------------------------------------------------
+% TEMPLATE POUR LES COMPTES RENDUS (DO3)
+% Auteur : Nadia LAHYA
+% Date : décembre 2025
+
+% ---------------- Encodage et Polices ----------------
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{tgadventor} 
+\renewcommand{\familydefault}{\sfdefault}
+\usepackage{pmboxdraw} 
+
+% ---------------- Mise en page ----------------
+\usepackage[margin=1.5cm, headheight=15pt, includeheadfoot]{geometry}
+\usepackage{float}
+\usepackage{multicol}
+\usepackage{graphicx}
+\usepackage{parskip} 
+
+% ---------------- Header / Footer ----------------
+\usepackage{fancyhdr}
+\usepackage{lastpage} 
+
+% ---------------- Couleurs ----------------
+\usepackage{xcolor}
+\definecolor{bleuFonce}{HTML}{004877}
+\definecolor{bleuClair}{HTML}{009FE1}
+\definecolor{DO}{HTML}{821980}
+\definecolor{fondCode}{HTML}{F0F0F0} 
+
+% ---------------- Liens Hypertextes ----------------
+\usepackage{hyperref}
+\hypersetup{colorlinks=true, linktoc=all, linkcolor=bleuFonce, urlcolor=bleuClair, citecolor=bleuFonce}
+
+% ---------------- Glossaire ----------------
+\usepackage{glossaries}
+\renewcommand*{\glstextformat}[1]{\textcolor{black}{#1}\textsuperscript{\textcolor{DO}{*}}}
+
+% ---------------- Style des titres ----------------
+\usepackage{sectsty}
+\sectionfont{\color{DO}}
+\subsectionfont{\color{bleuFonce}}
+\subsubsectionfont{\color{bleuClair}}
+\paragraphfont{\color{bleuClair}\normalfont}
+
+% ---------------- Boites de CODE ----------------
+\usepackage{tcolorbox}
+\tcbuselibrary{minted, skins, breakable}
+\newtcblisting{console}[1][]{ 
+    listing engine=minted,
+    minted language=bash, 
+    minted options={fontsize=\small, breaklines, autogobble, linenos=false},
+    colback=fondCode, colframe=gray!30, boxrule=0.5pt, arc=2mm,
+    left=5pt, right=5pt, top=5pt, bottom=5pt, listing only, breakable, #1 
+}
+
+
+% ---------------- Variables ----------------
+\newcommand{\titreTP}[1]{\def\theTitreTP{#1}}
+\newcommand{\matiere}[1]{\def\theMatiere{#1}} 
+\newcommand{\codeMatiere}[1]{\def\theCodeMat{#1}}
+\newcommand{\dateRendu}[1]{\def\theDate{#1}}
+
+% ---------------- Gestion des Étudiants (Singulier/Pluriel) ----------------
+\newcommand{\labelEtudiant}{Étudiant :} 
+\newcommand{\auteur}[1]{% Cas singulier
+    \def\theAuteur{#1}
+    \renewcommand{\labelEtudiant}{Étudiante :}
+}
+\newcommand{\auteurs}[1]{% Cas pluriel
+    \def\theAuteur{#1}
+    \renewcommand{\labelEtudiant}{Étudiants :}
+}
+
+% ---------------- Gestion des Enseignants (Singulier/Pluriel) ----------------
+\newcommand{\labelEnseignant}{Enseignant :} 
+\newcommand{\enseignant}[1]{% Cas singulier
+    \def\theProf{#1}
+    \renewcommand{\labelEnseignant}{Enseignant :}
+}
+\newcommand{\enseignants}[1]{% Cas pluriel
+    \def\theProf{#1}
+    \renewcommand{\labelEnseignant}{Enseignants :}
+}
+
+% ---------------- Configuration Header / Footer ----------------
+\pagestyle{fancy}
+\fancyhf{} 
+\fancyhead[L]{\small \color{bleuFonce} \theTitreTP}      
+\fancyhead[R]{\small \color{bleuFonce} \theCodeMat}      
+\fancyfoot[L]{\small \color{bleuFonce} Développement informatique et exploitation Opérationnelle} 
+\fancyfoot[R]{\small \color{bleuFonce} \thepage\ / \pageref{LastPage}}               
+\renewcommand{\headrule}{\color{bleuFonce}\hrule width\headwidth height 0.4pt}
+\renewcommand{\footrule}{\color{bleuFonce}\hrule width\headwidth height 0.4pt}
+
+% ---------------- Commande pour générer la page de garde ----------------
+\newcommand{\makeTitlePage}{
+    \begin{titlepage}
+        \thispagestyle{empty}
+        
+        % Logos
+        \noindent
+        \includegraphics[height=2cm]{images/Polytech_logo.png}
+        \hspace{7.5cm}     
+        \includegraphics[height=2cm]{images/DO_logo.png}
+        \hspace{0.2cm}
+        \includegraphics[height=2cm]{images/UM_logo.png}
+        \vfill
+        \centering
+        
+        % Matière et Code
+        {\LARGE \color{bleuFonce} \textbf{\theMatiere} \par}
+        \vspace{0.2cm}
+        {\large \color{bleuFonce} \theCodeMat \par}
+        
+        \vspace{1.5cm}
+        
+        % Bloc Titre
+        \textcolor{DO}{\rule{\linewidth}{0.5mm}} \\[0.4cm]
+        {\Huge \color{DO} \textbf{\theTitreTP} \par}
+        \vspace{0.1cm}
+        \textcolor{DO}{\rule{\linewidth}{0.5mm}}
+        
+        \vspace{2cm}
+        
+        % Bloc Noms (Auteurs / Enseignants) 
+        \begin{minipage}{0.45\textwidth}
+            \begin{flushleft} \large
+                \textbf{\color{bleuFonce}\labelEtudiant}\\
+                \color{bleuFonce} \theAuteur
+            \end{flushleft}
+        \end{minipage}
+        \hfill
+        \begin{minipage}{0.45\textwidth}
+            \begin{flushright} \large
+                \textbf{\color{bleuFonce}\labelEnseignant} \\
+                \color{bleuFonce} \theProf
+            \end{flushright}
+        \end{minipage}
+
+        \vfill
+        {\large \color{bleuFonce} \theDate \par}
+    \end{titlepage}
+    \newpage
+}
