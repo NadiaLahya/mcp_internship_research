@@ -266,30 +266,45 @@ candidati OR carriere OR lavoro OR posizioni aperte)
         \end{minipage}
     \end{figure}
 
+    \subsection{Extraction des données}
+    Le nœud \texttt{IA Agent} analyse les résultats de recherche bruts de Tavily et extrait les informations clés, en utilisant mon prompt personnalisé. Parmi ces informations figurent :
+    \begin{multicols}{2}
+        \begin{itemize}
+            \item le titre de l'offre
+            \item l'entreprise
+            \item l'URL
+            \item la ville
+            \item la durée du stage
+            \item les technologies requises (skills)
+            \item la rémunération proposée
+            \item la date limite de candidature
+        \end{itemize}
+    \end{multicols}
+
     \subsection{Système de classification : TOP / BOF / NON}
         \subsubsection{Justification du système de verdict}
-        Vu volume important de résultats de recherche, j'ai implémenté un système de classification tripartite pour filtrer efficacement les opportunités :
+        Au vu du volume important de résultats de recherche, j'ai implémenté un système de classification tripartite pour filtrer efficacement les opportunités :
 
-    \begin{center}
-        \begin{tabular}{|p{2cm}|p{15.5cm}|}
-        \hline
-            \textbf{Verdict} & \textbf{Critères d'attribution} \\
+        \begin{center}
+            \begin{tabular}{|p{2cm}|p{15.5cm}|}
             \hline
-            \textbf{TOP} & Offre parfaitement alignée : durée 8-10 semaines, technologie correspondante exactement, deadline compatible (après février 2026), rémunération mentionnée, entreprise reconnue \\
+                \textbf{Verdict} & \textbf{Critères d'attribution} \\
+                \hline
+                \textbf{TOP} & Offre parfaitement alignée : durée 8-10 semaines, technologie correspondante exactement, deadline compatible (après février 2026), rémunération mentionnée, entreprise reconnue \\
+                \hline
+                \textbf{BOF} & Offre acceptable avec compromis : durée limite (6-12 semaines), technologie adjacente mais pertinente, localisation secondaire, salaire non précisé mais probable \\
+                \hline
+                \textbf{NON} & Offre non pertinente : durée inadéquate (<6 ou >12 semaines), technologie sans rapport, CDI au lieu de stage, deadline passée, localisation géographique erronée \\
             \hline
-            \textbf{BOF} & Offre acceptable avec compromis : durée limite (6-12 semaines), technologie adjacente mais pertinente, localisation secondaire, salaire non précisé mais probable \\
-            \hline
-            \textbf{NON} & Offre non pertinente : durée inadéquate (<6 ou >12 semaines), technologie sans rapport, CDI au lieu de stage, deadline passée, localisation géographique erronée \\
-        \hline
-        \end{tabular}
-    \end{center}
-
-Ce système permet de récupérer automatiquement le Top 3 des meilleures offres pour la notification Discord.
+            \end{tabular}
+        \end{center}
 
         \subsubsection{Filtrage et Restructuration des données}
-        Une étape critique a été la restructuration des données entre les nœuds \texttt{Format agent input} et \texttt{Format agent output}. 
+        Une étape importante a été la restructuration des données entre les nœuds grâce aux nœuds \texttt{Format agent input} et \texttt{Format agent output}. 
         
-        Le nœud \texttt{Format agent output} effectue plusieurs opérations essentielles :
+        Premièrement, le nœud \texttt{Format agent input} agit en amont pour préparer les données avant l'analyse du LLM. Il convertit les données brutes et mal stucturées issues du nœud \texttt{Merge},entre Tavily et la récupération du clamment via le MCP, en un format JSON propre et cohérent, facilitant ainsi l'extraction des informations par le LLM.
+
+        Enfin, le nœud \texttt{Format agent output} effectue plusieurs opérations essentielles :
         \begin{enumerate}
             \item \gls{parsing} sécurisé : Gestion des réponses JSON avec multiples \gls{fallback} (ex. score d'une ville a 50 si le score n'est pas connu)
             \item Nettoyage : Suppression des marqueurs Markdown (\texttt{```json})
@@ -327,48 +342,48 @@ Ce système permet de récupérer automatiquement le Top 3 des meilleures offres
 
     \subsection{Les clés d'API}
     A plusieurs reprises j'ai du changer mon LLM en raison des quotas atteints avec très peu de manipulations.
+
+    \subsection{Hallucinations et "folies" de l'IA}
+        \subsubsection{Problématique majeure}
+        J'ai rencontré des problèmes récurrents et frustrants d'\gls{hallucination} où l'IA :
+        \begin{itemize}
+            \item Cherchait des appartements et logements au lieu de stages professionnels
+            \item Confondait les villes (ex: proposer Gênes au lieu de Genève, ou suggérer des offres en France, suggérer des d'autres ville hors celles demandées)
+            \item Attribuait des scores de ville fantaisistes, ignorant totalement les données fournies par le serveur MCP
+            \item Générait des URLs invalides ou des entreprises inexistantes
+        \end{itemize}
+        Ce comportement imprévisible a nécessité plusieurs modifications dans les prompts ainsi qu'une modification intégrale de la méthode de validation.
+
+    \subsubsection{Solutions implémentées}
+    Après de multiples itérations, j'ai mis en place les solutions suivantes :
+        \begin{enumerate}
+            \item Contraintes explicites dans le prompt 
+            \item Validation côté n8n : Filtrage strict des offres avec URLs manquantes, villes absentes du dataset, ou mots-clés suspects (apartment, rent, flat)  
+            \item Exclusions explicites dans les requêtes Tavily : Ajout de l'exclusion \texttt{-affitto -stanza -immobiliare -housing -rent -room -flat} pour filtrer les résultats de recherche en amont
+        \end{enumerate}
+
+    \subsection{Gestion d'erreurs et robustesse du système}
+        \subsubsection{Formats JSON variables}
+        L'IA Agent retournait parfois des formats inconsistants et imprévisibles :
+        \begin{itemize}
+            \item JSON entouré de \texttt{```json ... ```} (marqueurs Markdown)
+            \item Réponse en texte brut au lieu de JSON structuré
+            \item Champs manquants, renommés ou avec types de données incorrects
+            \item Arrays imbriqués de manière non standard
+        \end{itemize}
+
         
-\subsection{Hallucinations et "folies" de l'IA}
-    \subsubsection{Problématique majeure}
-    J'ai rencontré des problèmes récurrents et frustrants d'\gls{hallucination} où l'IA :
-    \begin{itemize}
-        \item Cherchait des appartements et logements au lieu de stages professionnels
-        \item Confondait les villes (ex: proposer Gênes au lieu de Genève, ou suggérer des offres en France, suggérer des d'autres ville hors celles demandées)
-        \item Attribuait des scores de ville fantaisistes, ignorant totalement les données fournies par le serveur MCP
-        \item Générait des URLs invalides ou des entreprises inexistantes
-    \end{itemize}
-    Ce comportement imprévisible a nécessité plusieurs modifications dans les prompts ainsi qu'une modification intégrale de la méthode de validation.
+        \textbf{Solution} : Implémentation d'un parser robuste avec multiples fallbacks dans \texttt{Format agent output}, incluant la détection automatique du format, le nettoyage des marqueurs, et la gestion gracieuse des erreurs.
+        
+        \subsubsection{Timeouts et échecs Tavily}
+        Certaines requêtes Tavily échouaient par timeout (recherches trop complexes ou serveurs distants lents).
+        
+        \textbf{Solution} : Ajout d'un mécanisme de retry avec délai exponentiel, et limitation stricte à \texttt{max\_results: 4}.
+        
+        \subsubsection{Synchronisation des nœuds}
+        La restructuration des données entre nœuds nécessitait une gestion d'erreur robuste pour éviter que le workflow ne s'arrête complètement si une seule offre était mal formatée par le LLM.
 
-\subsubsection{Solutions implémentées}
-Après de multiples itérations, j'ai mis en place les solutions suivantes :
-    \begin{enumerate}
-        \item Contraintes explicites dans le prompt 
-        \item Validation côté n8n : Filtrage strict des offres avec URLs manquantes, villes absentes du dataset, ou mots-clés suspects (apartment, rent, flat)  
-        \item Exclusions explicites dans les requêtes Tavily : Ajout de l'exclusion \texttt{-affitto -stanza -immobiliare -housing -rent -room -flat} pour filtrer les résultats de recherche en amont
-    \end{enumerate}
-
-\subsection{Gestion d'erreurs et robustesse du système}
-    \subsubsection{Formats JSON variables}
-    L'IA Agent retournait parfois des formats inconsistants et imprévisibles :
-    \begin{itemize}
-        \item JSON entouré de \texttt{```json ... ```} (marqueurs Markdown)
-        \item Réponse en texte brut au lieu de JSON structuré
-        \item Champs manquants, renommés ou avec types de données incorrects
-        \item Arrays imbriqués de manière non standard
-    \end{itemize}
-
-    
-    \textbf{Solution} : Implémentation d'un parser robuste avec multiples fallbacks dans \texttt{Format agent output}, incluant la détection automatique du format, le nettoyage des marqueurs, et la gestion gracieuse des erreurs.
-    
-    \subsubsection{Timeouts et échecs Tavily}
-    Certaines requêtes Tavily échouaient par timeout (recherches trop complexes ou serveurs distants lents).
-    
-    \textbf{Solution} : Ajout d'un mécanisme de retry avec délai exponentiel, et limitation stricte à \texttt{max\_results: 4}.
-    
-    \subsubsection{Synchronisation des nœuds}
-    La restructuration des données entre nœuds nécessitait une gestion d'erreur robuste pour éviter que le workflow ne s'arrête complètement si une seule offre était mal formatée par le LLM.
-
-    \textbf{Solution} : Système de try-catch exhaustif avec marquage des erreurs (verdict "ERREUR") permettant au workflow de continuer malgré les échecs partiels.
+        \textbf{Solution} : Système de try-catch exhaustif avec marquage des erreurs (verdict "ERREUR") permettant au workflow de continuer malgré les échecs partiels.
 
 \section{Résultats}
     \subsection{Bilan opérationnel}
@@ -384,7 +399,7 @@ Après de multiples itérations, j'ai mis en place les solutions suivantes :
         \begin{itemize}
             \item un bilan de la recherche qui a été faite
             \item le TOP 3 des meilleures offres trouvées et pourquoi elles ont été sélectionnées
-            \item un fichier CSV récapitulatif des meilleurs offres trouvées correspondants à ma recherche
+            \item un fichier CSV récapitulatif des meilleurs offres trouvées correspondants à ma recherche (consultable ici)
         \end{itemize}
 
         \begin{figure}[h!]
