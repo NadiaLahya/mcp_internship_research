@@ -43,4 +43,4 @@ npx n8n
 3. Discord : Collez l'URL de votre Webhook dans le nœud Discord pour recevoir les notifications finales.
 
 ## 📊 Résultats
-Le workflow génère un fichier CSV qui est envoyé sur Discord accompagné d'un message détaillant les top 3 recommendantions et un bilan global sur la recherche (cf. `images/discord_message.png`).
+Le workflow génère un fichier CSV (cf. `output/internships_offers.csv`) qui est envoyé sur Discord accompagné d'un message détaillant les top 3 recommendantions et un bilan global sur la recherche (cf. `images/discord_message.png`).

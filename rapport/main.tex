@@ -308,6 +308,13 @@ Ce système permet de récupérer automatiquement le Top 3 des meilleures offres
 
         Le nœud \texttt{Filter} supprime ensuite les offres marquées \texttt{NON} et les offres de 2025 (périmées), pour ne conserver que les réelles opportunités pour la notification Discord.
 
+    \subsection{Mon workflow complet}
+    \begin{figure}[h!]
+        \centering
+        \includegraphics[width=1\linewidth]{images/complete_workflow.png}
+        \caption{Capture de mon workflow n8n complet}
+    \end{figure}
+
 \section{Analyse critique et difficultés rencontrées}
     \subsection{Complexité du démarrage}
         \subsubsection{Courbe d'apprentissage abrupte}
@@ -320,8 +327,8 @@ Ce système permet de récupérer automatiquement le Top 3 des meilleures offres
 
     \subsection{Les clés d'API}
     A plusieurs reprises j'ai du changer mon LLM en raison des quotas atteints avec très peu de manipulations.
-
-\subsection{Hallucinations et "folie" de l'IA}
+        
+\subsection{Hallucinations et "folies" de l'IA}
     \subsubsection{Problématique majeure}
     J'ai rencontré des problèmes récurrents et frustrants d'\gls{hallucination} où l'IA :
     \begin{itemize}
@@ -363,7 +370,7 @@ Après de multiples itérations, j'ai mis en place les solutions suivantes :
 
     \textbf{Solution} : Système de try-catch exhaustif avec marquage des erreurs (verdict "ERREUR") permettant au workflow de continuer malgré les échecs partiels.
 
-\section{Résultats et performance}
+\section{Résultats}
     \subsection{Bilan opérationnel}
     Tout fonctionne comme attendu. Le workflow est stable, gère correctement les erreurs et remplit parfaitement son rôle malgré quelques folies encore visiles.
     
@@ -372,8 +379,19 @@ Après de multiples itérations, j'ai mis en place les solutions suivantes :
     
     Très peu de propositions inexactes atteignent l'alerte finale Discord, ce qui confirme la performance du système de tri et de gestion des hallucinations.
     
-    \subsection{Exemple de notification Discord générée}
-    Le système génère automatiquement un rapport formaté pour Discord (cf. Annexe B en \ref{Discord})
+    \subsection{Exemple de notification}
+    Le système génère automatiquement un rapport formaté pour Discord, qui comporte :
+        \begin{itemize}
+            \item un bilan de la recherche qui a été faite
+            \item le TOP 3 des meilleures offres trouvées et pourquoi elles ont été sélectionnées
+            \item un fichier CSV récapitulatif des meilleurs offres trouvées correspondants à ma recherche
+        \end{itemize}
+
+        \begin{figure}[h!]
+            \centering
+            \includegraphics[width=1\linewidth]{images/discord_message.png}
+            \caption{Exemple d'un message discord}
+        \end{figure}
 
 \section{Conclusion}
     \subsection{Objectifs atteints}
@@ -408,22 +426,6 @@ Après de multiples itérations, j'ai mis en place les solutions suivantes :
     Est-ce que je l'ulisierai dans ma future recherche de stage ? Certainement, le workwof m'a permis d'avoir des annonces que l'on retouve pas sur les plateformes classiques. Cependant, en raison des limitations des quotas et les problèmes d'hallucinations, je l'utiliserai en complément d'une recherche manuelle traditionnelle. La recherche manuelle me permettra une recherche pointilleuse tandis que le workflow automatisé m'aidera à découvrir des opportunités inattendues.
     
     Choisir une approche locale plutôt que conteneurisée s'est révélé être une décision judicieuse en termes d'apprentissage, qui m'a permis d'effectuer des cycles itératifs rapides. Toutefois, pour une mise en production à long terme, l'utilisation de Docker pour la conteneurisation est indispensable afin de garantir la reproductibilité et la portabilité.
-
-\clearpage
-\section{Annexes}
-\subsection{Annexe A - Capture du workflow n8n complet} 
-    \begin{figure}[h!]
-        \centering
-        \includegraphics[width=1\linewidth]{images/complete_workflow.png}
-        \caption{Capture du workflow n8n complet}
-    \end{figure}
-
-\subsection{Annexe B - Notification Discord}  \label{Discord}
-    \begin{figure}[h!]
-        \centering
-        \includegraphics[width=1\linewidth]{images/discord_message.png}
-        \caption{Exemple d'un message discord}
-    \end{figure}
 
 \clearpage
 \printglossaries
